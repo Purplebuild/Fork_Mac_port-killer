@@ -167,13 +167,21 @@ jobs:
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          xcrun notarytool submit "$DMG_NAME" \
+          # DMG notarization is optional since the app inside is already notarized
+          # But we try anyway for best user experience
+          SUBMIT_OUTPUT=$(xcrun notarytool submit "$DMG_NAME" \
             --apple-id "$APPLE_ID" \
             --password "$APPLE_ID_PASSWORD" \
             --team-id "$APPLE_TEAM_ID" \
-            --wait
+            --wait 2>&1) || true
 
-          xcrun stapler staple "$DMG_NAME"
+          echo "$SUBMIT_OUTPUT"
+
+          if echo "$SUBMIT_OUTPUT" | grep -q "Accepted"; then
+            xcrun stapler staple "$DMG_NAME" || echo "Stapling failed but continuing..."
+          else
+            echo "DMG notarization failed, but app inside is already notarized. Continuing..."
+          fi
 
       - name: Generate Sparkle EdDSA signature
         env:
