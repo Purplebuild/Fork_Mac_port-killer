@@ -277,24 +277,49 @@ jobs:
       - name: Get previous tag
         id: prev-tag
         run: |
-          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          # Get all tags sorted by version, find the one before current
+          CURRENT_TAG="${GITHUB_REF_NAME}"
+          PREV_TAG=$(git tag --sort=-v:refname | grep -A1 "^${CURRENT_TAG}$" | tail -1)
+          if [ "$PREV_TAG" = "$CURRENT_TAG" ]; then
+            PREV_TAG=""
+          fi
           echo "tag=$PREV_TAG" >> $GITHUB_OUTPUT
+          echo "Previous tag: $PREV_TAG"
 
       - name: Generate changelog
         id: changelog
         run: |
-          if [ -n "${{ steps.prev-tag.outputs.tag }}" ]; then
-            npx changelogithub --from ${{ steps.prev-tag.outputs.tag }} --to ${{ github.ref_name }} --output CHANGELOG_RELEASE.md || true
+          PREV_TAG="${{ steps.prev-tag.outputs.tag }}"
+          CURRENT_TAG="${GITHUB_REF_NAME}"
+
+          echo "Generating changelog from $PREV_TAG to $CURRENT_TAG"
+
+          # Generate changelog using git log
+          echo "## What's Changed" > CHANGELOG_RELEASE.md
+          echo "" >> CHANGELOG_RELEASE.md
+
+          if [ -n "$PREV_TAG" ]; then
+            # Get commits with conventional commit parsing
+            git log ${PREV_TAG}..${CURRENT_TAG} --pretty=format:"- %s by @%an" --no-merges | grep -v "^- chore: release" >> CHANGELOG_RELEASE.md || true
           else
-            npx changelogithub --to ${{ github.ref_name }} --output CHANGELOG_RELEASE.md || true
+            git log ${CURRENT_TAG} --pretty=format:"- %s by @%an" --no-merges -10 >> CHANGELOG_RELEASE.md || true
           fi
 
-          # If changelog generation failed or is empty, create default
-          if [ ! -s CHANGELOG_RELEASE.md ]; then
-            echo "### Changes" > CHANGELOG_RELEASE.md
-            echo "" >> CHANGELOG_RELEASE.md
-            git log ${{ steps.prev-tag.outputs.tag }}..${{ github.ref_name }} --pretty=format:"- %s" >> CHANGELOG_RELEASE.md || echo "- Various improvements and bug fixes" >> CHANGELOG_RELEASE.md
+          echo "" >> CHANGELOG_RELEASE.md
+          echo "" >> CHANGELOG_RELEASE.md
+          echo "### Installation" >> CHANGELOG_RELEASE.md
+          echo "1. Download the DMG file below" >> CHANGELOG_RELEASE.md
+          echo "2. Open the DMG and drag PortKiller to Applications" >> CHANGELOG_RELEASE.md
+          echo "3. Launch from Applications or Spotlight" >> CHANGELOG_RELEASE.md
+          echo "" >> CHANGELOG_RELEASE.md
+          echo "### Requirements" >> CHANGELOG_RELEASE.md
+          echo "- macOS 15.0+ (Sequoia)" >> CHANGELOG_RELEASE.md
+          echo "" >> CHANGELOG_RELEASE.md
+          if [ -n "$PREV_TAG" ]; then
+            echo "**Full Changelog**: https://github.com/productdevbook/port-killer/compare/${PREV_TAG}...${CURRENT_TAG}" >> CHANGELOG_RELEASE.md
           fi
+
+          cat CHANGELOG_RELEASE.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
