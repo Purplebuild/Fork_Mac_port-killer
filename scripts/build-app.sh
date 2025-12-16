@@ -24,6 +24,10 @@ echo "📋 Copying files..."
 cp "$BUILD_DIR/$APP_NAME" "$MACOS_DIR/"
 cp "Resources/Info.plist" "$CONTENTS_DIR/"
 
+# Debug: List contents of build directory
+echo "📂 Contents of $BUILD_DIR:"
+ls -la "$BUILD_DIR/" | grep -E "\.bundle$|^total" || echo "  (no bundles found)"
+
 # Copy icon if exists
 if [ -f "Resources/AppIcon.icns" ]; then
     cp "Resources/AppIcon.icns" "$RESOURCES_DIR/"
@@ -31,17 +35,26 @@ fi
 
 # Copy SPM resource bundle (contains toolbar icons)
 if [ -d "$BUILD_DIR/PortKiller_PortKiller.bundle" ]; then
+    echo "  → Copying PortKiller_PortKiller.bundle"
     cp -r "$BUILD_DIR/PortKiller_PortKiller.bundle" "$RESOURCES_DIR/"
+else
+    echo "  ⚠️  PortKiller_PortKiller.bundle not found"
 fi
 
 # Copy KeyboardShortcuts resource bundle (contains localizations)
 if [ -d "$BUILD_DIR/KeyboardShortcuts_KeyboardShortcuts.bundle" ]; then
+    echo "  → Copying KeyboardShortcuts_KeyboardShortcuts.bundle"
     cp -r "$BUILD_DIR/KeyboardShortcuts_KeyboardShortcuts.bundle" "$RESOURCES_DIR/"
+else
+    echo "  ⚠️  KeyboardShortcuts_KeyboardShortcuts.bundle not found"
 fi
 
 # Copy Defaults resource bundle (contains PrivacyInfo)
 if [ -d "$BUILD_DIR/Defaults_Defaults.bundle" ]; then
+    echo "  → Copying Defaults_Defaults.bundle"
     cp -r "$BUILD_DIR/Defaults_Defaults.bundle" "$RESOURCES_DIR/"
+else
+    echo "  ⚠️  Defaults_Defaults.bundle not found"
 fi
 
 # Download and copy Sparkle framework from official release (preserves symlinks)
@@ -62,6 +75,10 @@ ditto "$SPARKLE_CACHE/Sparkle.framework" "$CONTENTS_DIR/Frameworks/Sparkle.frame
 # Add rpath so executable can find the framework
 echo "🔗 Setting up framework path..."
 install_name_tool -add_rpath "@executable_path/../Frameworks" "$MACOS_DIR/$APP_NAME" 2>/dev/null || true
+
+# Verify bundles were copied
+echo "📂 Contents of $RESOURCES_DIR:"
+ls -la "$RESOURCES_DIR/"
 
 echo "🔏 Signing app bundle..."
 codesign --force --deep --sign - "$APP_DIR"
